@@ -157,9 +157,9 @@ After installation and configuration simply run
 
 
 
-## Netlfiy
+## Netlify
 
-We love [Netlify[(https://www.netlify.com/) at [DOJO4](http://dojo4.com).  RailsBuild works with netlify
+We love [Netlify](https://www.netlify.com/) at [DOJO4](http://dojo4.com).  RailsBuild works with netlify
 out of the box and simply requires
 
 ```yaml
