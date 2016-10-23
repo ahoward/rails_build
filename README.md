@@ -164,7 +164,7 @@ out of the box and simply requires
 
 ```yaml
 
-  build_command : rails_build
+  build_command : ./bin/rails_build
 
   build_directory: build
 
