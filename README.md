@@ -8,7 +8,7 @@ built as a Rails 5 engine.
 ## How It Works
 
 RailsBuild bundles all your assets, public directory, and configured urls into
-a static site suitable for deployment to Netlify, Amazon S3, or your favorite
+a static site suitable for deployment to [Netlify](https://www.netlify.com/), Amazon S3, or your favorite
 static website hosting solution.  It does this by:
 
 - Booting your application in *production* mode
@@ -159,7 +159,7 @@ After installation and configuration simply run
 
 ## Netlfiy
 
-We love Netlify at [DOJO4](http://dojo4.com).  RailsBuild works with netlify
+We love [Netlify[(https://www.netlify.com/) at [DOJO4](http://dojo4.com).  RailsBuild works with netlify
 out of the box and simply requires
 
 ```yaml
