@@ -1,0 +1,730 @@
+#!/usr/bin/env ruby
+
+# file : ./bin/rails_build
+
+END{ 
+
+  RailsBuild::CLI.build!  
+
+}
+
+
+module RailsBuild
+	class CLI
+		def CLI.usage
+			<<-__
+				NAME
+					rails_build
+
+				SYNOPSIS
+          a small, simple, bullet proof, and very fast static site generator built on rails 5
+
+        USAGE
+          rails_build [rails_root] *(options)
+
+          options:
+            --help, -h       : this message
+            --rails_root,--r : specifiy the RAILS_ROOT, default=./
+            --parallel,--p   : how many requests to make in parallel, default=n_cpus/2
+            --env,--e        : speciify the RAILS_ENV, default=production
+            --server, -s     : provide the url of the build server, do *not* start separate one
+            --log, -l        : specify the logfile, default=STDERR
+            --verbose, -v    : turn on verbose logging
+			__
+		end
+
+		def CLI.opts
+			GetoptLong.new(
+				[ '--help'			 , '-h' , GetoptLong::NO_ARGUMENT ]				, 
+				[ '--server'		 , '-s' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--parallel'	 , '-p' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--rails_root' , '-r' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--env'				 , '-e' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--log'	       , '-l' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--verbose'		 , '-v' , GetoptLong::NO_ARGUMENT ]				, 
+			)
+		end
+
+		def build!
+			prepare!
+
+			mkdir!
+
+			start_server! unless server
+
+			clear_cache!
+
+			extract_urls! url_for('/rails_build/configuration.json')
+
+			precompile_assets!
+
+			rsync_public!
+
+			parallel_build!
+
+			finalize!
+		end
+
+	#
+		def CLI.build!(*args, &block)
+			new(*args, &block).build!
+		end
+
+	#
+		attr_accessor :rails_root
+		attr_accessor :server
+		attr_accessor :directory
+		attr_accessor :uuid
+		attr_accessor :id
+		attr_accessor :env
+		attr_accessor :puma
+		attr_accessor :passenger
+		attr_accessor :url
+
+	#
+		def initialize(*args, &block)
+      setup!
+
+			@args = parse_args! 
+
+			@opts = parse_opts!
+
+			if @opts[:help]
+				usage!
+				exit(42)
+			end
+		end
+
+  #
+    def setup!
+		#
+			STDOUT.sync = true
+			STDERR.sync = true
+
+		#
+			ENV['SPRING_DISABLE'] = 'true'
+			ENV['DISABLE_SPRING'] = 'true'
+
+		#
+			%w[
+				fileutils pathname thread socket timeout time uri etc open-uri securerandom logger getoptlong rubygems json
+			].each do |stdlib|
+				require(stdlib)
+			end
+    end
+
+	#
+		def prepare!
+    #
+			@rails_root = find_rails_root!(@args[0] || '.')
+
+    #
+			Dir.chdir(@rails_root)
+
+    #
+			if File.exists?('./Gemfile')
+				require 'bundler/setup'
+				Bundler.setup(:require => false)
+			end
+
+		#
+			%w[
+        threadify persistent_http phusion_passenger
+			].each do |gem|
+        begin
+          require(gem)
+        rescue LoadError
+          abort "add gem 'rails_build' to your Gemfile"
+        end
+			end
+
+    #
+			begin
+				require('pry')
+			rescue LoadError
+				nil
+			end
+
+		#
+			@logger = Logger.new(@opts[:log] || STDERR)
+
+			@uuid			= ENV['RAILS_BUILD']
+			@time			= ENV['RAILS_BUILD_TIME']
+			@server		= @opts[:server] || ENV['RAILS_BUILD_SERVER']
+			@env			= @opts[:env] || ENV['RAILS_BUILD_ENV'] || ENV['RAILS_ENV']
+			@parallel = @opts[:parallel] || ENV['RAILS_BUILD_PARALLEL']
+			@verbose	= @opts[:verbose] || ENV['RAILS_BUILD_VERBOSE']
+
+			@uuid			||= SecureRandom.uuid
+			@time			||= Time.now.utc
+			@env			||= 'production'
+			@parallel ||= (Etc.nprocessors/2)
+
+			unless @time.is_a?(Time)
+				@time = Time.parse(@time.to_s).utc
+			end
+
+			@parallel = @parallel.to_i
+
+
+			@puma = 'bundle exec puma'
+			@pumactl = 'bundle exec pumactl'
+
+			@passenger = 'bundle exec passenger'
+
+			if ENV['RAILS_BUILD_DIRECTORY']
+				@build_directory = File.expand_path(ENV['RAILS_BUILD_DIRECTORY']) 
+			else
+				@build_directory = File.join(@rails_root, 'builds')
+			end
+
+			@directory = File.join(@build_directory, @uuid)
+
+			ENV['RAILS_ENV']				= @env
+			ENV['RAILS_BUILD']			= @uuid
+			ENV['RAILS_BUILD_ENV']	= @env
+			ENV['RAILS_BUILD_TIME'] = @time.httpdate
+
+			@urls = []
+
+			@started_at = Time.now
+		end
+
+  #
+    def find_rails_root!(path)
+      rails_root = File.expand_path(path.to_s)
+
+      loop do
+        is_rails_root = %w[ app lib config public ].all?{|dir| test(?d, File.join(rails_root, dir))}
+
+        if is_rails_root
+          return(rails_root)
+        else
+          rails_root = File.dirname(rails_root)
+          break if rails_root == '/'
+        end
+      end
+
+      abort("could not find a rails_root in or above #{ path }!?")
+    end
+
+	#
+		def parse_args!
+			@args = ARGV.map{|arg| "#{ arg }"}
+		end
+
+	#
+		def parse_opts!
+			@opts = Hash.new
+
+			CLI.opts.each do |opt, arg|
+				key, val = opt.split('--').last, arg
+				@opts[key] = (val == '' ? true : val)
+			end
+
+			@opts
+		end
+
+	#
+		def usage!
+			lines = CLI.usage.strip.split(/\n/)
+			n			 = lines[1].to_s.scan(/^\s+/).size
+			indent = ' ' * n
+			re		 = /^#{ Regexp.escape(indent) }/
+			usage  = lines.map{|line| line.gsub(re, '')}.join("\n")
+			STDERR.puts(usage)
+		end
+
+	#
+		def mkdir!
+			FileUtils.rm_rf(@directory)
+			FileUtils.mkdir_p(@directory)
+			log(:info, "directory: #{ @directory }")
+		end
+
+	#
+		def start_server!
+			@server =
+				nil
+
+			@port =
+				nil
+
+			ports =
+				(2000 .. 9000).to_a
+
+# TODO - get puma working...
+=begin
+			pidfile = File.join(@directory, "puma.pid")
+			statefile = File.join(@directory, "puma-state.txt")
+			configfile = File.join(@directory, "puma-config.rb")
+			FileUtils.touch(configfile)
+=end
+
+			start_server, stop_server = nil
+
+			ports.each do |port|
+				next unless port_open?(port)
+
+# TODO - get puma working...
+=begin
+				start_server =
+					"puma --port=#{ port } --environment=#{ @env } --pidfile=#{ pidfile } --state=#{ statefile } --config=#{ configfile } --daemon --preload config.ru"
+				stop_server =
+					"#{ @pumactl } --pidfile=#{ pidfile } --state=#{ statefile } stop"
+=end
+				start_server =
+					"#{ @passenger } start --daemonize --environment #{ @env } --port #{ port } --max-pool-size 16"
+				stop_server =
+					"#{ @passenger } stop --port #{ port }"
+
+				`#{ stop_server } 2>&1`.strip
+
+				log(:info, "cmd: #{ start_server }")
+				server_output = `#{ start_server } 2>&1`.strip
+
+				log(:info, "status: #{ $?.exitstatus }")
+
+				t = Time.now.to_f
+				timeout = 10
+				i = 0
+
+				loop do
+					i += 1
+
+					begin
+						url = "http://localhost:#{ port }"
+						open(url){|socket| socket.read}
+						@server = url
+						@port = port
+						break
+					rescue Object => e
+						if i > 2
+							log :error, "#{ e.message }(#{ e.class })\n"
+							log :error, "#{ server_output }\n\n"
+						end
+
+						if((Time.now.to_f - t) > timeout)
+							abort("could not start server inside of #{ timeout } seconds ;-/")
+						else
+							sleep(rand(0.42))
+						end
+					end
+				end
+
+				break if @server
+			end
+
+		# barf if server could not be started
+		#
+			unless @server
+				abort("could not start server on any of ports #{ ports.first } .. #{ ports.last }")
+			else
+				log(:info, "started server on #{ @server }")
+			end
+
+		# set assassins to ensure the server daemon never outlives the build script
+		# no matter how it is killed (even -9)
+		#
+			at_exit{
+				log(:info, "cmd: #{ stop_server }")
+				`#{ stop_server } >/dev/null 2>&1`
+				log(:info, "status: #{ $?.exitstatus }")
+				log(:info, "stopped server #{ @server }")
+			}
+
+			assassin = <<-__
+				pid = #{ Process.pid }
+
+				4242.times do
+					begin
+						Process.kill(0, pid)
+					rescue Object => e
+						if e.is_a?(Errno::ESRCH)
+							`#{ stop_server } >/dev/null 2>&1`
+							Process.kill(-15, pid) rescue nil
+							sleep(rand + rand)
+							Process.kill(-9, pid) rescue nil
+						end
+						exit
+					end
+					sleep(1 + rand)
+				end
+			__
+			IO.binwrite('tmp/build-assassin.rb', assassin)
+			cmd = "nohup ruby tmp/build-assassin.rb >/dev/null 2>&1 &"
+			system cmd
+
+		#
+			@started_at = Time.now
+			@server
+		end
+
+	#
+		def extract_urls!(build_url)
+			urls = []
+
+			code, body = http_get(build_url)
+
+			unless code == 200
+				raise "failed to get build urls from #{ build_url }"
+			end
+
+			@_build = JSON.parse(body)
+
+			unless @_build['urls'].is_a?(Array)
+				raise "failed to find any build urls at #{ build_url }"
+			end
+
+			urls = @_build['urls']
+
+			urls.map!{|url| url_for(url)}
+
+			log(:info, "extracted #{ urls.size } urls to build from #{ build_url }")
+
+			@urls = urls
+		end
+
+	#
+		def clear_cache!
+			#spawn "rake tmp:cache:clear"
+			spawn "rails runner 'Rails.cache.clear'"
+		end
+
+	#
+		def precompile_assets!
+			@asset_dir = File.join(@rails_root, "public/assets")
+			@asset_tmp = false
+
+			if test(?d, @asset_dir)
+				@asset_tmp = File.join(@rails_root, "tmp/assets-build-#{ @uuid }")
+				FileUtils.mv(@asset_dir, @asset_tmp) 
+			end
+
+			spawn "RAILS_ENV=production rake assets:precompile"
+
+			assets = Dir.glob(File.join(@rails_root, 'public/assets/**/**'))
+
+			log(:info, "precompiled #{ assets.size } assets")
+
+			ensure_non_digested_assets_also_exist!(assets)
+		end
+
+	#
+		def rsync_public!
+			spawn "rsync -avz ./public/ #{ @directory }"
+
+			count = 0
+			
+			Dir.glob(File.join(@directory, '**/**')).each{ count += 1 }
+
+			log(:info, "rsync'd #{ count } files")
+
+			if @asset_tmp
+				FileUtils.rm_rf(@asset_dir)
+				FileUtils.mv(@asset_tmp, @asset_dir) 
+			end
+		end
+
+	#
+		def parallel_build!(n = nil)
+			n ||= @parallel
+
+			stats = {
+				:success => [], :missing => [], :failure => [],
+			}
+
+			times = Queue.new
+
+			avg = nil
+
+			Thread.new do
+				Thread.current.abort_on_exception = true
+				total = 0.0
+				n = 0
+				loop do
+					while(time = times.pop)
+						total += time
+						n += 1
+						avg = (total / n).round(2) 
+					end
+				end
+			end
+
+			a = Time.now.to_f
+
+			_stats =
+				@urls.threadify(n) do |url|
+					uri = uri_for(url)
+					path = path_for(uri)
+					upath = uri.path
+					rpath = relative_path(path, :from => @directory)
+
+					_a = Time.now.to_f
+
+					code, body = http_get(uri)
+
+					_b = Time.now.to_f
+					_e = (_b - _a).round(2)
+
+					times.push(_e)
+
+					label = "#{ code } @ (t̄:#{ avg }s)"
+
+					case code
+						when 200
+							write_path(path, body)
+							log(:info, "#{ label }: #{ upath } -> #{ rpath } (t:#{ _e }s)")
+							[:success, url]
+						when 404
+							log(:error, "#{ label }: #{ upath }")
+							[:missing, url]
+						when 500
+							log(:error, "#{ label }: #{ upath }")
+							[:failure, url]
+						else
+							log(:error, "#{ label }: #{ upath }")
+							[:failure, url]
+					end
+				end
+				
+			_stats.each{|stat, url| stats[stat].push(url)}
+
+			b = Time.now.to_f
+
+			borked = false
+
+			if stats[:missing].size > 0
+				borked = true
+				log(:error, "missing on #{ stats[:missing].size } urls")
+			end
+
+			if stats[:failure].size > 0
+				borked = true
+				log(:error, "failure on #{ stats[:failure].size } urls")
+			end
+
+			if borked
+				exit(1)
+			end
+
+			elapsed =  b - a
+			n = @urls.size
+			rps = (n / elapsed).round(2)
+
+			log(:info, "downloaded #{ n } urls at ~#{ rps }/s")
+
+			@urls
+		end
+
+	#
+		def finalize!
+			@finished_at = Time.now
+			elapsed = (@finished_at.to_f - @started_at.to_f)
+			log(:info, "build time - #{ hms(elapsed) }")
+			on_netlify = ENV['DEPLOY_PRIME_URL'].to_s =~ /netlify/
+			strategy = on_netlify ? 'cp_r' : 'ln_s' # netlify refuses to deploy from a symlink ;-/ # FIXME
+			build = File.join(@rails_root, 'build')
+			FileUtils.rm_rf(build)
+			FileUtils.send(strategy, @directory, build)
+			log(:info, "preview with `static ./build/` # brew install node-static")
+		end
+
+	#
+		def http_get(url)
+			response = HTTP.get(url.to_s, :follow => true)
+			body = response.body.to_s rescue ''
+			code = response.status.code rescue 500
+			[code, body]
+		end
+
+		def http_connection
+			@http_connection ||= (
+				PersistentHTTP.new({
+					:url					=> @server,
+					:pool_size		=> (@parallel + 1),
+					:logger				=> (@verbose ? @logger : nil),
+					:pool_timeout => 10,
+					:warn_timeout => 1,
+					:force_retry	=> true,
+				})
+			)
+		end
+
+		def http_get(url)
+			request = Net::HTTP::Get.new(url)
+			response = http_connection.request(request)
+
+			if response.is_a?(Net::HTTPRedirection)
+				location = response['Location']
+				if location.to_s == url.to_s
+					log(:fatal, "circular redirection on #{ url }")
+					exit(1)
+				end
+				return http_get(location)
+			end
+
+			code = response.code.to_i rescue 500
+			body = response.body.to_s rescue ''
+
+			[code, body]
+		end
+
+	#
+		def path_for(url)
+			uri = uri_for(url)
+
+			case
+				when uri.path=='/' || uri.path=='.'
+					path = File.join(@directory, 'index.html')
+				else
+					path = File.join(@directory, uri.path)
+					dirname, basename = File.split(path)
+					base, ext = basename.split('.', 2)
+					if ext.nil?
+						path = File.join(path, 'index.html')
+					end
+			end
+			path
+		end
+
+	#
+		def write_path(path, body)
+			FileUtils.mkdir_p(File.dirname(path))
+			IO.binwrite(path, body)
+		end
+
+	#
+		def ensure_non_digested_assets_also_exist!(assets)
+			re = /(-{1}[a-z0-9]{32}*\.{1}){1}/
+
+			assets.each do |file|
+				next if File.directory?(file) || file !~ re
+				source = file.split('/')
+				source.push(source.pop.gsub(re, '.'))
+				non_digested = File.join(source)
+				#log(:debug, "asset: #{ file } -> #{ non_digested }")
+				FileUtils.ln(file, non_digested)
+			end
+		end
+
+	#
+		def url_for(url)
+			uri = URI.parse(url.to_s)
+
+			if uri.absolute?
+				uri.to_s
+			else
+				relative_uri = URI.parse(@server)
+				relative_uri.path = absolute_path_for(uri.path)
+				relative_uri.query = uri.query
+				relative_uri.fragment = uri.fragment
+				relative_uri.to_s
+			end
+		end
+
+	#
+		def uri_for(url)
+			uri = url.is_a?(URI) ? url : URI.parse(url.to_s)
+		end
+
+	#
+		def to_s
+			@directory.to_s
+		end
+
+	#
+		def log(level, *args, &block)
+			@logger.send(level, *args, &block)
+		end
+
+	#
+		def hms(seconds)
+			return unless seconds
+			"%02d:%02d:%02d" % hours_minutes_seconds(seconds)
+		end
+
+	#
+		def hours_minutes_seconds(seconds)
+			return unless seconds
+			seconds = Float(seconds).to_i
+			hours, seconds = seconds.divmod(3600)
+			minutes, seconds = seconds.divmod(60)
+			[hours.to_i, minutes.to_s, seconds]
+		end
+
+	#
+		def stopwatch(&block)
+			a = Time.now
+			result = block.call
+			b = Time.now
+			[result, b.to_f - a.to_f]
+		end
+
+	#
+		def port_open?(port, options = {})
+			seconds = options[:timeout] || 1
+			ip = options[:ip] || '0.0.0.0'
+
+			Timeout::timeout(seconds) do
+				begin
+					TCPSocket.new(ip, port).close
+					false
+				rescue Errno::ECONNREFUSED, Errno::EHOSTUNREACH
+					true
+				rescue Object
+					false
+				end
+			end
+		rescue Timeout::Error
+			false
+		end
+
+	#
+		def paths_for(*args)
+			path = args.flatten.compact.join('/')
+			path.gsub!(%r|[.]+/|, '/')
+			path.squeeze!('/')
+			path.sub!(%r|^/|, '')
+			path.sub!(%r|/$|, '')
+			paths = path.split('/')
+		end
+
+	#
+		def absolute_path_for(*args)
+			path = ('/' + paths_for(*args).join('/')).squeeze('/')
+			path unless path.strip.empty?
+		end
+
+	#
+		def relative_path_for(*args)
+			path = absolute_path_for(*args).sub(%r{^/+}, '')
+			path unless path.strip.empty?
+		end
+
+	#
+		def relative_path(path, *args)
+			options = args.last.is_a?(Hash) ? args.pop : {}
+			path = path.to_s
+			relative = args.shift || options[:relative] || options[:to] || options[:from]
+			if relative
+				Pathname.new(path).relative_path_from(Pathname.new(relative.to_s)).to_s
+			else
+				relative_path_for(path)
+			end
+		end
+
+	#
+		def spawn(command)
+			oe = `#{ command } 2>&1`
+
+			unless $? == 0
+				msg = "command(#{ command }) failed with (#{ $? })"
+				log(:error, msg)
+				raise(msg)
+			end
+
+			oe
+		end
+	end
+end
