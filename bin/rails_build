@@ -27,7 +27,8 @@ module RailsBuild
             --rails_root,--r : specifiy the RAILS_ROOT, default=./
             --parallel,--p   : how many requests to make in parallel, default=n_cpus/2
             --env,--e        : speciify the RAILS_ENV, default=production
-            --server, -s     : provide the url of the build server, do *not* start separate one
+            --url, -u        : provide the url of the build server, do *not* start separate one
+            --server, -s     : passenger | puma, default=passenger
             --log, -l        : specify the logfile, default=STDERR
             --verbose, -v    : turn on verbose logging
 			__
@@ -36,7 +37,8 @@ module RailsBuild
 		def CLI.opts
 			GetoptLong.new(
 				[ '--help'			 , '-h' , GetoptLong::NO_ARGUMENT ]				, 
-				[ '--server'		 , '-s' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--url'   		 , '-u' , GetoptLong::REQUIRED_ARGUMENT ] , 
+				[ '--server'   	 , '-s' , GetoptLong::REQUIRED_ARGUMENT ] , 
 				[ '--parallel'	 , '-p' , GetoptLong::REQUIRED_ARGUMENT ] , 
 				[ '--rails_root' , '-r' , GetoptLong::REQUIRED_ARGUMENT ] , 
 				[ '--env'				 , '-e' , GetoptLong::REQUIRED_ARGUMENT ] , 
@@ -50,7 +52,7 @@ module RailsBuild
 
 			mkdir!
 
-			start_server! unless server
+			start_server! unless url
 
 			clear_cache!
 
@@ -72,14 +74,13 @@ module RailsBuild
 
 	#
 		attr_accessor :rails_root
+		attr_accessor :url
 		attr_accessor :server
 		attr_accessor :directory
 		attr_accessor :uuid
 		attr_accessor :id
 		attr_accessor :env
-		attr_accessor :puma
-		attr_accessor :passenger
-		attr_accessor :url
+		attr_accessor :parallel
 
 	#
 		def initialize(*args, &block)
@@ -129,7 +130,7 @@ module RailsBuild
 
 		#
 			%w[
-        threadify persistent_http phusion_passenger
+        threadify persistent_http
 			].each do |gem|
         begin
           require(gem)
@@ -148,15 +149,17 @@ module RailsBuild
 		#
 			@logger = Logger.new(@opts[:log] || STDERR)
 
-			@uuid			= ENV['RAILS_BUILD']
-			@time			= ENV['RAILS_BUILD_TIME']
-			@server		= @opts[:server] || ENV['RAILS_BUILD_SERVER']
-			@env			= @opts[:env] || ENV['RAILS_BUILD_ENV'] || ENV['RAILS_ENV']
-			@parallel = @opts[:parallel] || ENV['RAILS_BUILD_PARALLEL']
-			@verbose	= @opts[:verbose] || ENV['RAILS_BUILD_VERBOSE']
+			@uuid     = ENV['RAILS_BUILD']
+			@time     = ENV['RAILS_BUILD_TIME']
+			@url      = @opts[:url]             || ENV['RAILS_BUILD_URL']
+			@server   = @opts[:server]          || ENV['RAILS_BUILD_SERVER']
+			@env      = @opts[:env]             || ENV['RAILS_BUILD_ENV']      || ENV['RAILS_ENV']
+			@parallel = @opts[:parallel]        || ENV['RAILS_BUILD_PARALLEL']
+			@verbose  = @opts[:verbose]         || ENV['RAILS_BUILD_VERBOSE']
 
 			@uuid			||= SecureRandom.uuid
 			@time			||= Time.now.utc
+      @server   ||= 'passenger'
 			@env			||= 'production'
 			@parallel ||= (Etc.nprocessors/2)
 
@@ -165,12 +168,6 @@ module RailsBuild
 			end
 
 			@parallel = @parallel.to_i
-
-
-			@puma = 'bundle exec puma'
-			@pumactl = 'bundle exec pumactl'
-
-			@passenger = 'bundle exec passenger'
 
 			if ENV['RAILS_BUILD_DIRECTORY']
 				@build_directory = File.expand_path(ENV['RAILS_BUILD_DIRECTORY']) 
@@ -188,6 +185,12 @@ module RailsBuild
 			@urls = []
 
 			@started_at = Time.now
+
+      unless(( server = Server.for(@server, self) ))
+        abort "no server found for server=#{ @server.inspect }"
+      else
+        @server = server
+      end
 		end
 
   #
@@ -219,7 +222,7 @@ module RailsBuild
 
 			CLI.opts.each do |opt, arg|
 				key, val = opt.split('--').last, arg
-				@opts[key] = (val == '' ? true : val)
+				@opts[key.to_s.to_sym] = (val == '' ? true : val)
 			end
 
 			@opts
@@ -244,7 +247,7 @@ module RailsBuild
 
 	#
 		def start_server!
-			@server =
+			@url =
 				nil
 
 			@port =
@@ -253,30 +256,15 @@ module RailsBuild
 			ports =
 				(2000 .. 9000).to_a
 
-# TODO - get puma working...
-=begin
-			pidfile = File.join(@directory, "puma.pid")
-			statefile = File.join(@directory, "puma-state.txt")
-			configfile = File.join(@directory, "puma-config.rb")
-			FileUtils.touch(configfile)
-=end
-
 			start_server, stop_server = nil
+
+      @server.setup!
 
 			ports.each do |port|
 				next unless port_open?(port)
 
-# TODO - get puma working...
-=begin
-				start_server =
-					"puma --port=#{ port } --environment=#{ @env } --pidfile=#{ pidfile } --state=#{ statefile } --config=#{ configfile } --daemon --preload config.ru"
-				stop_server =
-					"#{ @pumactl } --pidfile=#{ pidfile } --state=#{ statefile } stop"
-=end
-				start_server =
-					"#{ @passenger } start --daemonize --environment #{ @env } --port #{ port } --max-pool-size 16"
-				stop_server =
-					"#{ @passenger } stop --port #{ port }"
+        start_server = @server.start_command_for(port)
+        stop_server = @server.stop_command_for(port)
 
 				`#{ stop_server } 2>&1`.strip
 
@@ -295,7 +283,7 @@ module RailsBuild
 					begin
 						url = "http://localhost:#{ port }"
 						open(url){|socket| socket.read}
-						@server = url
+						@url = url
 						@port = port
 						break
 					rescue Object => e
@@ -312,15 +300,15 @@ module RailsBuild
 					end
 				end
 
-				break if @server
+				break if @url
 			end
 
 		# barf if server could not be started
 		#
-			unless @server
+			unless @url
 				abort("could not start server on any of ports #{ ports.first } .. #{ ports.last }")
 			else
-				log(:info, "started server on #{ @server }")
+				log(:info, "started server on #{ @url }")
 			end
 
 		# set assassins to ensure the server daemon never outlives the build script
@@ -330,7 +318,7 @@ module RailsBuild
 				log(:info, "cmd: #{ stop_server }")
 				`#{ stop_server } >/dev/null 2>&1`
 				log(:info, "status: #{ $?.exitstatus }")
-				log(:info, "stopped server #{ @server }")
+				log(:info, "stopped server #{ @url }")
 			}
 
 			assassin = <<-__
@@ -357,7 +345,7 @@ module RailsBuild
 
 		#
 			@started_at = Time.now
-			@server
+			@url
 		end
 
 	#
@@ -541,7 +529,7 @@ module RailsBuild
 		def http_connection
 			@http_connection ||= (
 				PersistentHTTP.new({
-					:url					=> @server,
+					:url					=> @url,
 					:pool_size		=> (@parallel + 1),
 					:logger				=> (@verbose ? @logger : nil),
 					:pool_timeout => 10,
@@ -615,7 +603,7 @@ module RailsBuild
 			if uri.absolute?
 				uri.to_s
 			else
-				relative_uri = URI.parse(@server)
+				relative_uri = URI.parse(@url)
 				relative_uri.path = absolute_path_for(uri.path)
 				relative_uri.query = uri.query
 				relative_uri.fragment = uri.fragment
@@ -727,4 +715,99 @@ module RailsBuild
 			oe
 		end
 	end
+
+#
+  class Server
+    def Server.for(type, cli, *args, &block)
+      type = type.to_s.strip.downcase
+
+      case type
+        when /puma/
+          Puma.new(cli, *args, &block)
+        when /passenger/
+          Passenger.new(cli, *args, &block)
+        else
+          nil
+      end
+    end
+    
+    def initialize(cli)
+      @cli = cli
+    end
+
+    def setup!
+      nil
+    end
+
+    class Puma < Server
+      def initialize(cli)
+        @cli = cli
+
+        @env = @cli.env
+        @directory = @cli.directory
+        @rails_root = @cli.rails_root
+        @parallel = @cli.parallel
+
+        @puma = "bundle exec puma"
+        @pumactl = "bundle exec pumactl"
+
+        @pidfile = @cli.relative_path(File.join(@directory, ".puma-pid.txt"), :from => @cli.rails_root)
+        @statefile = @cli.relative_path(File.join(@directory, ".puma-state.txt"), :from => @cli.rails_root)
+      end
+
+      def start_command_for(port)
+        %W[
+          #{ @puma }
+          --pidfile=#{ @pidfile }
+          --state=#{ @statefile }
+          --port=#{ port }
+          --environment=#{ @env }
+          --workers=#{ @parallel }
+          --config=/dev/null
+          --threads=1:1
+          --preload
+          --daemon
+          ./config.ru
+        ].join(' ').strip
+      end
+
+      def stop_command_for(port)
+        %W[
+         #{ @pumactl }
+         --pidfile=#{ @pidfile }
+         --state=#{ @statefile }
+         stop
+        ].join(' ').strip
+      end
+    end
+
+    class Passenger < Server
+      def initialize(cli)
+        @cli = cli
+
+        @env = @cli.env
+        @directory = @cli.directory
+        @rails_root = @cli.rails_root
+        @parallel = @cli.parallel
+
+        @passenger = "bundle exec passenger"
+      end
+
+      def start_command_for(port)
+        "#{ @passenger } start --daemonize --environment #{ @env } --port #{ port } --max-pool-size #{ @parallel }"
+      end
+
+      def stop_command_for(port)
+        "#{ @passenger } stop --port #{ port }"
+      end
+
+      def setup!
+        begin
+          require 'phusion_passenger'
+        rescue LoadError => le
+          abort "please add `gem 'passenger'` to your Gemfile"
+        end
+      end
+    end
+  end
 end
