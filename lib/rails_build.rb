@@ -1,6 +1,8 @@
 require "rails_build/engine"
 
 module RailsBuild
+  require "fattr"
+
   Fattr(:application){ defined?(Rails.application) ? Rails.application : nil }
 
   def RailsBuild.configure(&block)

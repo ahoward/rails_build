@@ -92,13 +92,16 @@ like './about' vs. '../about'
 
 ## Optimization and Notes
 
-
 RailsBuild is fast.  Very fast.  [DOJO4](http://dojo4.com) has seen optimized [Middleman](https://middlemanapp.com/) builds of > 30 minutes dropped to *60 seconds* by simply making basic use of Rails' built-in caching facilites.
+
+You app has to run in production mode to build!  Don't forget to setup
+secrets, or anything else generally required in production mode.
 
 When trying to squeeze out performance just remember that RailsBuild runs in
 production mode and, therefore, making a build go fast follows the *exact same
 rules* as making anything other Rails' application fast.  The first place to
 reach is typically fragment caching of partials used in your app.
+
 
 Finally, don't forget about *./config/initializers/assets.rb* - RailsBuild
 doesn't do anything special to the asset pipeline and only those assets

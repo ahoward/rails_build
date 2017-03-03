@@ -3,7 +3,7 @@ module RailsBuild
 
     isolate_namespace RailsBuild
 
-		initializer "rails_build.routes" do |application|
+    initializer "rails_build.routes" do |application|
     # see config/routes.rb
     #
       RailsBuild.application = application
@@ -44,7 +44,7 @@ module RailsBuild
           end
         end
       end
-		end
+    end
 
   end
 end
