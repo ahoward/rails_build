@@ -55,7 +55,7 @@ That's it: simply enumerate the urls - anything additional to your assets and
 
 ## On Trailing Slashes
 
-Most static hosting solutions support Apache style directory indexing will be
+Most static hosting solutions support Apache style directory indexing and will be
 better behaved with urls that look like
 
 ```markdown
