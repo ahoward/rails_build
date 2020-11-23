@@ -129,8 +129,17 @@ module RailsBuild
       end
 
     #
+      @default_server =
+        begin
+          require 'phusion_passenger'
+          'passenger'
+        rescue LoadError
+          'puma'
+        end
+
+    #
       %w[
-        threadify persistent_http
+        parallel persistent_http
       ].each do |gem|
         begin
           require(gem)
@@ -157,11 +166,11 @@ module RailsBuild
       @parallel = @opts[:parallel]        || ENV['RAILS_BUILD_PARALLEL']
       @verbose  = @opts[:verbose]         || ENV['RAILS_BUILD_VERBOSE']
 
-      @uuid      ||= SecureRandom.uuid
-      @time      ||= Time.now.utc
-      @server   ||= 'passenger'
+      @uuid     ||= SecureRandom.uuid
+      @time     ||= Time.now.utc
+      @server   ||= @default_server
       @env      ||= 'production'
-      @parallel ||= (Etc.nprocessors/2)
+      @parallel ||= (Etc.nprocessors / 2)
 
       unless @time.is_a?(Time)
         @time = Time.parse(@time.to_s).utc
@@ -403,7 +412,26 @@ module RailsBuild
 
   #
     def rsync_public!
-      spawn "rsync -avz ./public/ #{ @directory }"
+      commands = [
+        "rsync -avz ./public/ #{ @directory }",
+        "cp -ru ./public/ #{ @directory }"
+      ]
+
+      rsynced = false
+
+      commands.each do |command|
+        begin
+          spawn(command)
+          rsynced = true
+          break
+        rescue
+          next
+        end
+      end
+
+      unless rsynced
+        abort "failed all of `#{ commands.join(' | ') }`"
+      end
 
       count = 0
       
@@ -445,7 +473,7 @@ module RailsBuild
       a = Time.now.to_f
 
       _stats =
-        @urls.threadify(n) do |url|
+        Parallel.map(@urls.uniq, :in_threads => n) do |url|
           uri = uri_for(url)
           path = path_for(uri)
           upath = uri.path

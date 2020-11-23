@@ -1,14 +1,28 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Rails build</title>
-  <%= stylesheet_link_tag    "rails_build/application", media: "all" %>
-  <%= javascript_include_tag "rails_build/application" %>
-  <%= csrf_meta_tags %>
-</head>
-<body>
+  <head>
+    <title>Rails Build</title>
 
-<%= yield %>
+    <style>
+      body{
+        font-size: 150%;
+      }
 
-</body>
+      a:link,
+      a:visited,
+      a:active
+      {
+        color: black;
+      }
+      a:hover
+      {
+        color: #FF69B4;
+      }
+    </style>
+  </head>
+
+  <body>
+    <%= yield %>
+  </body>
+
 </html>
