@@ -1,182 +1,120 @@
-# RailsBuild
+# TL;DR;
 
-A very small, very simple, very fast, and bullet proof static site generator
-built as a Rails 5 engine.
+- install
 
+  ```sh
 
+    echo 'gem "raild_build"' >> Gemfile
 
-## How It Works
+    bundle
 
-RailsBuild bundles all your assets, public directory, and configured urls into
-a static site suitable for deployment to [Netlify](https://www.netlify.com/), Amazon S3, or your favorite
-static website hosting solution.  It does this by:
+  ```
 
-- Booting your application in *production* mode
-- Precompiling all assets
-- Including every static resource in ./public/
-- GET'ing every configured url via super fast parallel downloading
+- setup
 
-RailsBuild let's you leverage the entire Rails' ecosystem for your static
-sites and requires learning practically no new techniques to make super fast
-building static websites.
+  ```sh
 
+    touch ./config/rails_build.rb
 
+    # see below
 
-## Configuration
+  ```
 
-Configuration is quite simple, typically it will be much less than comparable
-static site generators.  You need to drop a *./config/rails_build.rb* looking
-something like this into your app:
+- build
+
+  ```sh
+
+    rails_build
+
+  ```
+
+- deploy
+
+  ```sh
+
+    #  the contents of ./build/ are good to deploy to *any* static web host
+    #  including netlify, vercel, an s3 bucket, or simply your app's own
+    #  ./public directory in order to 'pre-cache' a ton of pages
+
+  ```
+
+# ABOUT
+
+  rails_build is a very small, fast enough, static site generator built on top
+  of the rails you already know and love.
+
+  it has a small set of dependencies, namely the `parallel` gem, and requires
+  absolutely minimal configuration.  it should be pretty darn self
+  explanatory:
 
 ```ruby
 
-  RailsBuild.configure do |rails_build|
+  # file : ./config/rails_build.rb
 
-    urls = rails_build.urls
+  <<~________
 
-    urls << "/"
+    this file should to enumerate all the urls you'd like to build
 
-    urls << "/about/"
+    the contents of your ./public directory, and any assets, are automaticaly
+    included
 
-    urls << "/contact/"
+    therefore you need only declare which dynamic urls, that is to say, 'routes'
 
- 
+    you would like included in your build
+
+    it is not loaded except during build time, and will not affect your normal
+    rails app in any way
+
+  ________
+
+
+  RailsBuild.configure do |config|
+
+    # most of the time you are going to want your route included, which will
+    # translate into an ./index.html being output in the build
+    #
+
+    config.urls << '/'
+
+    # include any/all additional routes youd' like built thusly
+    #
+
     Post.each do |post|
-      urls << blog_path(post) 
+      config.urls << "/posts/#{ post.id }"
     end
 
-  end
-
-
-```
-
-That's it: simply enumerate the urls - anything additional to your assets and
-./public/ directory - that you want to include in your build.
-
-## On Trailing Slashes
-
-Most static hosting solutions support Apache style directory indexing and will be
-better behaved with urls that look like
-
-```markdown
-
-  http://my.site.com/blog/
-
-```
-
-vs.
-
-```markdown
-
-  http://my.site.com/blog
-
-```
-
-RailsBuild tries to help you do this with a little bit of Rails' config that
-is turned on by default but which can be turned off via
-
-```ruby
-
-  RailsBuild.configure do |rails_build|
-
-    rails_build.trailing_slash false  # the default is 'true'
+    # thats it! - now just run `rails_build` and you are GTG
 
   end
 
 ```
 
-The only real impact will be felt if you are using relative urls in your site
-like './about' vs. '../about'
+# MOTIVATION
+
+why another static site builder?  why not hugo or, the
+other-soon-to-be-released-blazing-fast-one-i-am-building-on Roda?
+
+because:
+
+- there are a lot of Rails apps
+
+- nothing is as fast as static
+
+- Rails has no facility to 'pre-render' routes on deployment
+
+so, you can use this tool to leverage the code and the app you already have,
+and/or to utilize the entire Rails ecosystem, it's docs and gems, to build
+sophisticated sites without needing to learn yet another framework.
+
+# HOW IT WORKS
+
+as always, docs are worthless, RTFC ->
 
 
-
-## Optimization and Notes
-
-RailsBuild is fast.  Very fast.  [DOJO4](http://dojo4.com) has seen optimized [Middleman](https://middlemanapp.com/) builds of > 30 minutes dropped to *60 seconds* by simply making basic use of Rails' built-in caching facilites.
-
-You app has to run in production mode to build!  Don't forget to setup
-secrets, or anything else generally required in production mode.
-
-When trying to squeeze out performance just remember that RailsBuild runs in
-production mode and, therefore, making a build go fast follows the *exact same
-rules* as making anything other Rails' application fast.  The first place to
-reach is typically fragment caching of partials used in your app.
-
-
-Finally, don't forget about *./config/initializers/assets.rb* - RailsBuild
-doesn't do anything special to the asset pipeline and only those assets
-normally built when
-
-```bash
-
-  ~> rake assets:precompile
-
-```
-
-is run will be included in the build.
-
-
-
-## Installation
-
-Add this line to your application's Gemfile:
-
-```ruby
-
-  gem 'rails_build'
-
-
-```
-
-And then execute:
-
-```bash
-
-$ bundle
-
-$ bundle binstubs rails_build
-
-
-```
-
-
-
-## Building Your Site
-
-
-After installation and configuration simply run
-
-```bash
-
-  ~> ./bin/rails_build
-
-
-# or, if you prefer, simply
-
-  ~> rails build
-
-
-```
-
-
-
-## Netlify
-
-We love [Netlify](https://www.netlify.com/) at [DOJO4](http://dojo4.com).  RailsBuild works with netlify
-out of the box and simply requires
-
-```yaml
-
-  build_command : ./bin/rails_build
-
-  build_directory: build
-
-```
-
-to be configured as the build command and directory respectively.
-
-
-
-## License
+# LICENSE
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
+
+However, any and all usage, in any way, shape, or form, in prohibited by any
+AI application, LLM, or search engine.  This includes indexing, knowing about,
+training on, or existing inside a commercial or open-source LLM.

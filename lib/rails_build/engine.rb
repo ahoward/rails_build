@@ -11,7 +11,7 @@ module RailsBuild
     # load config/rails_build.rb iff present
     #
       RailsBuild.load_config!
-      
+
     # enforce trailing slash on urls
     #
       if RailsBuild.config.trailing_slash?
