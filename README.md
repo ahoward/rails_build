@@ -14,9 +14,7 @@
 
   ```sh
 
-    touch ./config/rails_build.rb
-
-    # see below
+    rails_build --init
 
   ```
 
@@ -28,13 +26,17 @@
 
   ```
 
-- deploy
+- deploy?
 
-  ```sh
+  ```markdown
 
-    #  the contents of ./build/ are good to deploy to *any* static web host
-    #  including netlify, vercel, an s3 bucket, or simply your app's own
-    #  ./public directory in order to 'pre-cache' a ton of pages
+    the contents of ./build/ are good to deploy to *any* static web host
+    including netlify, vercel, an s3 bucket, or simply your app's own ./public
+    directory in order to 'pre-cache' a ton of pages
+
+    ps. if you want to preview your local static ./build i *highly* recommend
+
+      https://github.com/copiousfreetime/launchy
 
   ```
 
@@ -108,7 +110,9 @@ sophisticated sites without needing to learn yet another framework.
 
 # HOW IT WORKS
 
-as always, docs are worthless, RTFC ->
+as always, docs are worthless and Ruby is beautiful, so #RTFC ->
+
+https://github.com/ahoward/rails_build/blob/main/bin/rails_build
 
 
 # LICENSE
