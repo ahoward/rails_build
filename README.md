@@ -28,17 +28,14 @@
 
 - deploy?
 
-  ```markdown
+  the contents of ./build/ are good to deploy to *any* static web host
+  including netlify, vercel, an s3 bucket, or simply your app's own ./public
+  directory in order to 'pre-cache' a ton of pages
 
-    the contents of ./build/ are good to deploy to *any* static web host
-    including netlify, vercel, an s3 bucket, or simply your app's own ./public
-    directory in order to 'pre-cache' a ton of pages
+  ps. if you want to preview your local static ./build i *highly* recommend
 
-    ps. if you want to preview your local static ./build i *highly* recommend
+    https://github.com/copiousfreetime/launchy
 
-      https://github.com/copiousfreetime/launchy
-
-  ```
 
 # ABOUT
 
