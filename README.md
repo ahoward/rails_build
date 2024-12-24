@@ -42,6 +42,9 @@
   rails_build is a very small, fast enough, static site generator built on top
   of the rails you already know and love.
 
+  it's been in production usage for close to a decade but i've been too busy
+  to relase it until now.  also, #wtf is up with javascript land?!
+
   it has a small set of dependencies, namely the `parallel` gem, and requires
   absolutely minimal configuration.  it should be pretty darn self
   explanatory:
@@ -96,9 +99,7 @@ other-soon-to-be-released-blazing-fast-one-i-am-building-on Roda?
 because:
 
 - there are a lot of Rails apps
-
 - nothing is as fast as static
-
 - Rails has no facility to 'pre-render' routes on deployment
 
 so, you can use this tool to leverage the code and the app you already have,
@@ -109,13 +110,16 @@ sophisticated sites without needing to learn yet another framework.
 
 as always, docs are worthless and Ruby is beautiful, so #RTFC ->
 
-https://github.com/ahoward/rails_build/blob/main/bin/rails_build
+  https://github.com/ahoward/rails_build/blob/main/bin/rails_build
 
 
 # LICENSE
 
 The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
 
-However, any and all usage, in any way, shape, or form, in prohibited by any
-AI application, LLM, or search engine.  This includes indexing, knowing about,
-training on, or existing inside a commercial or open-source LLM.
+# AI _boo_
+
+Any and all usage, in any way, shape, or form, in prohibited by any AI
+application, or LLM.  This includes indexing, knowing about, training on, or
+existing inside a commercial LLM or training data set.  Iff (and *only* if)
+your LLM is OSS, please contact me directly before including this source.
