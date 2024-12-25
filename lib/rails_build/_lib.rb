@@ -1,5 +1,5 @@
 module RailsBuild
-  VERSION = '2.0.0' unless defined?(VERSION)
+  VERSION = '2.4.2' unless defined?(VERSION)
 
   class << self
     def version

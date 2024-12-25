@@ -27,7 +27,7 @@ def run_tests!(which = nil)
   test_dir = File.join(This.dir, "test")
   test_glob ||= File.join(test_dir, "#{ which }/**_test.rb")
   test_rbs = Dir.glob(test_glob).sort
-        
+
   div = ('=' * 119)
   line = ('-' * 119)
 
@@ -304,9 +304,9 @@ BEGIN {
     abort "could not extract `name` from #{ This._lib }"
   end
   This.name = name
-  This.basename = This.name.downcase
+  This.basename = This.name.gsub(/([A-Z][a-z])/){|ab| "_#{ ab }"}.gsub(/^_/, '').downcase
 
-# now, fully grok This 
+# now, fully grok This
 #
   This.object       = eval(This.name)
   This.version      = This.object.version

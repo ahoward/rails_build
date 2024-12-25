@@ -72,8 +72,9 @@
 
   RailsBuild.configure do |config|
 
-    # most of the time you are going to want your route included, which will
-    # translate into an ./index.html being output in the build
+    # most of the time you are going to want your root route included, which
+    # will translate into an ./index.html being output in the build, as you
+    # would expect
     #
 
     config.urls << '/'
