@@ -288,7 +288,7 @@ module RailsBuild
 
     def extract_urls!
       path = @config.path
-      urls = @config.urls
+      urls = @config.urls.uniq
 
       if urls.size == 0
         abort("failed to find any rails_build urls in:\n#{ @config.to_json }")

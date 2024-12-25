@@ -72,7 +72,7 @@ module RailsBuild
       defaults = {
         path: RailsBuild.config_path,
         trailing_slash: (defined?(Rails) ? !!Rails.application.default_url_options[:trailing_slash] : false),
-        force_ssl: (defined?(Rails) ? !!Rails.configuration.force_ssl : true),
+        force_ssl: (defined?(Rails) ? !!Rails.configuration.force_ssl : false),
         urls: %w[ / ],
         index_html: true,
       }
