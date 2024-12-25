@@ -1,19 +1,6 @@
-require 'fileutils'
-require 'pathname'
-require 'thread'
-require 'socket'
-require 'timeout'
-require 'time'
-require 'uri'
-require 'etc'
-require 'securerandom'
-require 'logger'
-require 'json'
-require 'tempfile'
-require 'net/http'
+require_relative 'rails_build/_lib.rb'
 
-require 'getoptlong'
-require 'parallel'
+RailsBuild.load_dependencies!
 
 module RailsBuild
   def RailsBuild.configure(&block)
