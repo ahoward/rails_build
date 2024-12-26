@@ -9,7 +9,7 @@ TL;DR;
 - install
 
   ```sh
-    echo 'gem "rails_build"' >> Gemfile
+    echo 'gem "raild_build"' >> Gemfile
     bundle
   ```
 
