@@ -3,7 +3,7 @@
 - install
 
   ```sh
-    echo 'gem "raild_build"' >> Gemfile
+    echo 'gem "rails_build"' >> Gemfile
     bundle
   ```
 
