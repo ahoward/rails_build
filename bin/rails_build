@@ -209,8 +209,6 @@ module RailsBuild
     def mkdir!
       FileUtils.rm_rf(@directory)
       FileUtils.mkdir_p(@directory)
-
-      log(:info, "build: #{ @directory }")
     end
 
   #
@@ -357,74 +355,42 @@ module RailsBuild
 
       if @asset_tmp
         FileUtils.rm_rf(@asset_dir)
-        FileUtils.mv(@asset_tmp, @asset_dir) 
+        FileUtils.mv(@asset_tmp, @asset_dir)
       end
     end
 
 #
     def parallel_build!
-      size = @parallel
+      slices =
+        @urls.each_slice(@parallel).map.to_a
 
-      stats = {
-        :success => [],
-        :missing => [],
-        :failure => [],
-      }
+      Parallel.each(slices, in_processes: @parallel) do |slice|
+        Parallel.each(slice, in_threads: 4) do |url|
+          uri = uri_for(url)
+          path = path_for(uri)
 
-      times = []
+          rpath = relative_path(path, :from => @directory)
 
-      Parallel.each(@urls, in_threads: 8) do |url|
-        uri = uri_for(url)
-        path = path_for(uri)
+          code = nil
+          body = nil
 
-        rpath = relative_path(path, :from => @directory)
+          time =
+            timing do
+              code, body = http_get(uri)
+              write_path(path, body) if code == 200
+            end
 
-        code = nil
-        body = nil
+          msg = "#{ url } -> /#{ rpath } (time:#{ time }, code:#{ code })"
 
-        time =
-          timing do
-            code, body = http_get(uri)
-            write_path(path, body) if code == 200
+          case code
+            when 200
+              log(:info, msg)
+            else
+              log(:error, msg)
+              abort
           end
-
-        times.push(time)
-        ts = times.dup
-        rps = (ts.size / ts.sum).round(4)
-        msg = "#{ url } -> /#{ rpath } (time:#{ time }, rps:#{ rps }, code:#{ code })"
-
-        case code
-          when 200
-            log(:info, msg)
-            stats[:success].push(url)
-          when 404
-            log(:error, msg)
-            stats[:missing].push(url)
-          else
-            log(:error, msg)
-            stats[:failure].push(url)
         end
       end
-
-      borked = 0
-
-      if stats[:missing].size > 0
-        borked += stats[:missing].size
-        log(:error, "missing on #{ stats[:missing].size } url(s)")
-      end
-
-      if stats[:failure].size > 0
-        borked += stats[:failure].size
-        log(:error, "failure on #{ stats[:failure].size } url(s)")
-      end
-
-      if borked > 0
-        exit(borked)
-      end
-
-      rps = (times.size / times.sum).round(4)
-
-      log(:info, "downloaded #{ @urls.size } urls at ~#{ rps } rps")
 
       @urls
     end
@@ -446,8 +412,6 @@ module RailsBuild
 
       FileUtils.rm_rf(build)
       FileUtils.send(cp, @directory, build)
-
-      #log(:info, "to preview run: ruby -run -ehttpd ./build/ -p4242")
     end
 
     def timing(&block)
@@ -707,6 +671,9 @@ module RailsBuild
       system("#{ version_command } >/dev/null 2>&1") ||
         abort("app fails to load via: #{ version_command }")
 
+      @cli.log(:info, "rails_build version: #{ RailsBuild.version }")
+      @cli.log(:info, "build: #{ @directory }")
+
       q = Queue.new
 
       cmd = start_command_for(port)
@@ -750,15 +717,15 @@ module RailsBuild
           RAILS_BUILD=#{ @uuid }
 
           RAILS_SERVE_STATIC_FILES=true
-          RAILS_LOG_TO_STDOUT=true
+          RAILS_LOG_TO_STDOUT=false
           WEB_CONCURRENCY=#{ @parallel.to_s }
+          RAILS_MAX_THREADS=8
 
           rails server
 
           --environment=#{ @env }
           --port=#{ port }
           --binding=0.0.0.0
-          --log-to-stdout
         ]
       )
     end

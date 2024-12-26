@@ -163,6 +163,26 @@
   and/or to utilize the entire Rails ecosystem, it's docs and gems, to build
   sophisticated sites without needing to learn yet another framework.
 
+# SPEED
+
+  `rails_build` is as fast as your rails app.  optimizing the build means
+  optimizing your app so, the internet abounds with advice here, and all the
+  production stuff one might normally do, caching, etc, is applicable for
+  cranking things up.  that being said, on a 'normal' laptop one should expect
+  to crank through 1000 urls in 10s of seconds.  this is what is meant by,
+  _"good enough"_.
+
+# ENV
+
+  at build time, the following environment variables will be available to your
+  app, such that i can _"know"_ that it is being built.  they should be self
+  explanatory:
+
+  ```ruby
+      ENV['RAILS_BUILD'] # a uuid fo the build
+      ENV['RAILS_BUILD_TIME'] # a timestamp when the build was run
+
+  ```
 
 # RTFM
 

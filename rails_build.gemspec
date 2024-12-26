@@ -3,7 +3,7 @@
 
 Gem::Specification::new do |spec|
   spec.name = "rails_build"
-  spec.version = "2.4.4"
+  spec.version = "2.4.5"
   spec.required_ruby_version = '>= 3.0'
   spec.platform = Gem::Platform::RUBY
   spec.summary = "a small, simple, bullet proof, and fast enough static site generator built on top of the rails you already know and love"
@@ -14,6 +14,7 @@ Gem::Specification::new do |spec|
 ["LICENSE",
  "README.md",
  "Rakefile",
+ "TODO.md",
  "bin",
  "bin/rails_build",
  "lib",
