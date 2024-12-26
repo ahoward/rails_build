@@ -1,4 +1,10 @@
-# TL;DR;
+SELF
+----
+
+  https://github.com/ahoward/rails_build
+
+TL;DR;
+------
 
 - install
 
@@ -30,7 +36,8 @@
     https://github.com/copiousfreetime/launchy
 
 
-# ABOUT
+ABOUT
+-----
 
   rails_build is a very small, fast enough, static site generator built on top
   of the rails you already know and love.
@@ -85,7 +92,8 @@
 
   ```
 
-# CONFIGURATION
+CONFIGURATION
+-------------
 
   although `rails_build` aims to be as zero-config as possible, it does expose
   a few configuration settings, which you may configure in
@@ -148,7 +156,8 @@
       Rails.application.default_url_options[:trailing_slash]
     ```
 
-# MOTIVATION
+MOTIVATION
+----------
 
   why yet _another_ static site builder?  why not hugo or, the
   other-soon-to-be-released-blazing-fast-one-i-am-building-on Roda?
@@ -163,7 +172,8 @@
   and/or to utilize the entire Rails ecosystem, it's docs and gems, to build
   sophisticated sites without needing to learn yet another framework.
 
-# SPEED
+SPEED
+-----
 
   `rails_build` is as fast as your rails app.  optimizing the build means
   optimizing your app so, the internet abounds with advice here, and all the
@@ -172,7 +182,8 @@
   to crank through 1000 urls in 10s of seconds.  this is what is meant by,
   _"good enough"_.
 
-# ENV
+ENV
+---
 
   at build time, the following environment variables will be available to your
   app, such that i can _"know"_ that it is being built.  they should be self
@@ -184,22 +195,26 @@
 
   ```
 
-# RTFM
+RTFM
+----
 
   as always, docs are worthless and ruby is beautiful, so #RTFC ->
 
     https://github.com/ahoward/rails_build/blob/main/bin/rails_build
 
 
-# LICENSE
-
-  the gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
-
-# AI _boo_
+NOAI
+----
+  the gem is released under a 'NOAI' license.
 
   any and all usage, in any way, shape, or form, in prohibited by any ai
-  application, or llm.  this includes indexing, knowing about, training on, or
-  existing inside a commercial llm or training data set.  iff (that is not a
-  typo) your llm is oss, please contact me directly before including this source.
+  application, or llm.  this includes indexing, editor support, knowing about,
+  training on, or existing inside a commercial llm or training data set.  iff
+  (that is not a typo) your llm is oss, please contact me directly before
+  including this source.
 
   any usage by openai, or google, is forbidden regardless.
+
+  for all other purposes and usages, the license is the same as Ruby's.
+
+  ... helping Ruby developers keep thier jobs since 1995.
