@@ -99,14 +99,14 @@ CONFIGURATION
   a few configuration settings, which you may configure in
   `config/rails_build.rb`:
 
-    - *config.urls*
+  - *config.urls*
 
-      as shown above, the config has a list of urls that the build process
-      will GET.  this is a simple array and contains only '/' by default, the
-      root route, such that the default unconfigured build would map '/' ->
-      'index.html' and not be empty.  if your app does not have a root route,
-      or you do not wish to include that route in your build, simply call
-      `config.urls.clear`
+    as shown above, the config has a list of urls that the build process will
+    GET.  this is a simple array and contains only '/' by default, the root
+    route, such that the default unconfigured build would map '/' ->
+    'index.html' and not be empty.  if your app does not have a root route, or
+    you do not wish to include that route in your build, simply call
+    `config.urls.clear`
 
 
   - *config.force_ssl*
@@ -149,8 +149,8 @@ CONFIGURATION
 
   - *config.trailing_slash*
 
-    this is current un-used, but maybe be used in the future.  it's default is the
-    value of
+    this is currently un-used, but maybe be used in the future in combination
+    with `config.index_html`.  it's default is the value of
 
     ```ruby
       Rails.application.default_url_options[:trailing_slash]
@@ -164,9 +164,9 @@ MOTIVATION
 
   because:
 
-    - there are a lot of Rails apps
-    - nothing is as fast as static
-    - Rails has no facility to 'pre-render' routes on deployment
+  - there are a lot of Rails apps
+  - nothing is as fast as static
+  - Rails has no facility to 'pre-render' routes on deployment
 
   so, you can use this tool to leverage the code and the app you already have,
   and/or to utilize the entire Rails ecosystem, it's docs and gems, to build
@@ -200,7 +200,7 @@ RTFM
 
   as always, docs are worthless and ruby is beautiful, so #RTFC ->
 
-    https://github.com/ahoward/rails_build/blob/main/bin/rails_build
+  https://github.com/ahoward/rails_build/blob/main/bin/rails_build
 
 
 NOAI
